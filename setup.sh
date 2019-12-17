@@ -35,6 +35,8 @@ ZONE=${ZONES[0]}
 #
 # Create a Filestore instance to store the data
 #
+echo [+] Creating a Filestore instance to store the data
+
 gcloud filestore instances create $STORAGE_INSTANCE_ID \
 --zone=$ZONE \
 --tier=STANDARD \
@@ -44,6 +46,8 @@ gcloud filestore instances create $STORAGE_INSTANCE_ID \
 #
 # Create a MySQL instance on GCP
 #
+echo [+] Creating a MySQL instance
+
 gcloud beta sql instances create $DB_HOST_NAME \
 --region $REGION \
 --network=default \
@@ -55,6 +59,8 @@ gcloud beta sql instances create $DB_HOST_NAME \
 #
 # Create a database on the MySQL instance
 #
+echo [+] Creating a database on the MySQL instance
+
 gcloud sql databases create $DB_NAME \
 --instance=$DB_HOST_NAME \
 --charset=utf8 \
@@ -67,10 +73,14 @@ FOUND=
 FOUND=$(gcloud sql users list --instance=$DB_HOST_NAME --format='value(name)' | grep $DB_USERNAME)
 
 if [ -z $FOUND ]; then
+  echo [+] Creating the database user : $DB_USERNAME
+  
   gcloud sql users create $DB_USERNAME \
 --instance=$DB_HOST_NAME \
 --password=$DB_PASSWORD
 else
+  echo [+] Setting a known password to the database user : $DB_USERNAME
+  
   gcloud sql users set-password $DB_USERNAME \
 --host=% \
 --instance=$DB_HOST_NAME \
@@ -81,17 +91,25 @@ fi
 #
 # Create the secrets with the credentials
 #
+echo [+] Creating a Kubernetes Secret with the database credentials
+
 kubectl create secret generic database-credentials --from-literal=username=$DB_USERNAME --from-literal=password=$DB_PASSWORD
 
 #
 # Get the IP of the MySQL instance and the Filestore instance
 #
+echo -n [+] Getting the IP of the MySQL instance :
 DB_HOST=$(gcloud sql instances describe $DB_HOST_NAME | grep ipAddress: | grep -oP '\d+.\d+.\d+.\d+')
+echo " $DB_HOST"
+echo -n [+] Getting the IP of the Filestore instance :
 STORAGE_HOST=$(gcloud filestore instances describe $STORAGE_INSTANCE_ID --zone $ZONE | grep -A1 ipAddresses: | grep -oP '\d+.\d+.\d+.\d+')
+echo " $STORAGE_HOST"
 
 #
 # Create the deployment on GKE
 #
+echo [+] Creating the deployment on GKE
+
 cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
@@ -145,4 +163,15 @@ spec:
           value: “true”
 EOF
 
+#
+# Expose the deployment to the internet
+#
+echo [+] Exposing the deployment to the internet
+
 kubectl expose deployment $NAME-deployment --type=LoadBalancer --name=expose-$NAME
+
+#
+# End of the script
+#
+echo [+] Done!
+
