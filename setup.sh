@@ -19,7 +19,7 @@ REGION=us-east4
 
 ## Auto-filled variables
 
-DB_HOST_NAME=${NAME}-database
+DB_HOST_NAME=${NAME}-database-${RANDOM}
 DB_NAME=$NAME
 DB_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 ##
