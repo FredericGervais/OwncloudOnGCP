@@ -26,11 +26,9 @@ DB_PASSWORD=$(cat /dev/urandom | tr -dc 'a-zA-Z0-9' | fold -w 32 | head -n 1)
 LOWER_CASE=$(echo $STORAGE_NAME | tr '[:upper:]' '[:lower:]')
 STORAGE_INSTANCE_ID=${LOWER_CASE}-${RANDOM}${RANDOM}
 ##
-declare -a ZONES
 ZONES=($(gcloud compute zones list --filter="REGION:($REGION)" --format="value(name)"))
 ZONE=${ZONES[0]}
 ##
-
 
 #
 # Create a Filestore instance to store the data
@@ -87,14 +85,6 @@ else
 --password=$DB_PASSWORD
 fi
 
-
-#
-# Create the secrets with the credentials
-#
-echo [+] Creating a Kubernetes Secret with the database credentials
-
-kubectl create secret generic database-credentials --from-literal=username=$DB_USERNAME --from-literal=password=$DB_PASSWORD
-
 #
 # Get the IP of the MySQL instance and the Filestore instance
 #
@@ -104,6 +94,32 @@ echo " $DB_HOST"
 echo -n [+] Getting the IP of the Filestore instance :
 STORAGE_HOST=$(gcloud filestore instances describe $STORAGE_INSTANCE_ID --zone $ZONE | grep -A1 ipAddresses: | grep -oP '\d+.\d+.\d+.\d+')
 echo " $STORAGE_HOST"
+
+#
+# Create the secrets with the credentials
+#
+echo [+] Creating a Kubernetes Secret with the database credentials
+
+kubectl create secret generic database-credentials --from-literal=OWNCLOUD_DB_USERNAME=$DB_USERNAME --from-literal=OWNCLOUD_DB_PASSWORD=$DB_PASSWORD
+
+#
+# Create a ConfigMap with the environment variables
+#
+echo [+] Creating a ConfigMap with the environment variables
+
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-variables
+  namespace: default
+data:
+  OWNCLOUD_DB_TYPE: mysql
+  OWNCLOUD_DB_HOST: $DB_HOST
+  OWNCLOUD_DB_NAME: $DB_NAME
+  OWNCLOUD_DB_PREFIX: $DB_PREFIX
+  OWNCLOUD_MYSQL_UTF8MB4: "true"
+EOF
 
 #
 # Create the deployment on GKE
@@ -129,7 +145,7 @@ spec:
     spec:
       volumes:
       - name: nfs-volume
-        nfs: 
+        nfs:
           server: $STORAGE_HOST
           path: /$STORAGE_NAME
       containers:
@@ -140,38 +156,23 @@ spec:
         volumeMounts:
         - name: nfs-volume
           mountPath: /mnt/data
-        env:
-        - name: OWNCLOUD_DB_TYPE
-          value: mysql
-        - name: OWNCLOUD_DB_HOST
-          value: $DB_HOST
-        - name: OWNCLOUD_DB_USERNAME
-          valueFrom:
-            secretKeyRef:
-              name: database-credentials
-              key: username
-        - name: OWNCLOUD_DB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-credentials
-              key: password
-        - name: OWNCLOUD_DB_NAME
-          value: $DB_NAME
-        - name: OWNCLOUD_DB_PREFIX
-          value: $DB_PREFIX
-        - name: OWNCLOUD_MYSQL_UTF8MB4
-          value: “true”
+        envFrom:
+        - configMapRef:
+            name: environment-variables
+        - secretRef:
+            name: database-credentials
 EOF
 
 #
 # Expose the deployment to the internet
 #
-echo [+] Exposing the deployment to the internet
+echo [+] Exposing the deployment to the internet on port 80
 
-kubectl expose deployment $NAME-deployment --type=LoadBalancer --name=expose-$NAME
+kubectl expose deployment $NAME-deployment --type=LoadBalancer --name=expose-$NAME --port=80 --target-port=$CONTAINER_PORT
 
 #
 # End of the script
 #
 echo [+] Done!
+
 
