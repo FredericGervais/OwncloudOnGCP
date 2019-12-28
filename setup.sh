@@ -4,7 +4,7 @@
 #               kubernetes cluster
 # 
 # Author      : Frederic Gervais
-# Date        : 2019/12/16
+# Date        : 2019/12/27
 #
 
 IMAGE=owncloud/server:latest
