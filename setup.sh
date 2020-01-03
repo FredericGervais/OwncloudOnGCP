@@ -42,6 +42,17 @@ gcloud filestore instances create $STORAGE_INSTANCE_ID \
 --network=name=$STORAGE_NETWORK
 
 #
+# Create a Service Networking connection
+#
+echo [+] Creating a Service Networking connection
+
+gcloud compute addresses create service-networking-connection \
+--global \
+--purpose=VPC_PEERING \
+--prefix-length=16 \
+--network=$STORAGE_NETWORK
+
+#
 # Create a MySQL instance on GCP
 #
 echo [+] Creating a MySQL instance
