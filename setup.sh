@@ -52,6 +52,11 @@ gcloud compute addresses create service-networking-connection \
 --prefix-length=16 \
 --network=$STORAGE_NETWORK
 
+gcloud services vpc-peerings connect \
+--service=servicenetworking.googleapis.com \
+--ranges=service-networking-connection \
+--network=$STORAGE_NETWORK
+
 #
 # Create a MySQL instance on GCP
 #
