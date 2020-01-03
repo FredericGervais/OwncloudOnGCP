@@ -46,6 +46,7 @@ gcloud filestore instances create $STORAGE_INSTANCE_ID \
 #
 echo [+] Creating a MySQL instance
 
+gcloud services enable servicenetworking.googleapis.com
 gcloud beta sql instances create $DB_HOST_NAME \
 --region $REGION \
 --network=default \
